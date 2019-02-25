@@ -14,7 +14,6 @@
 #include <linux/mount.h>
 #include <linux/file.h>
 #include <linux/quotaops.h>
-#include <linux/random.h>
 #include <linux/uuid.h>
 #include <asm/uaccess.h>
 #include "ext4_jbd2.h"
@@ -97,6 +96,7 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	int err;
 	struct inode *inode_bl;
 	struct ext4_inode_info *ei_bl;
+	struct ext4_sb_info *sbi = EXT4_SB(sb);
 
 	if (inode->i_nlink != 1 || !S_ISREG(inode->i_mode))
 		return -EINVAL;
@@ -155,8 +155,10 @@ static long swap_inode_boot_loader(struct super_block *sb,
 
 	inode->i_ctime = inode_bl->i_ctime = ext4_current_time(inode);
 
-	inode->i_generation = prandom_u32();
-	inode_bl->i_generation = prandom_u32();
+	spin_lock(&sbi->s_next_gen_lock);
+	inode->i_generation = sbi->s_next_generation++;
+	inode_bl->i_generation = sbi->s_next_generation++;
+	spin_unlock(&sbi->s_next_gen_lock);
 
 	ext4_discard_preallocations(inode);
 
@@ -189,11 +191,7 @@ journal_err_out:
 	return err;
 }
 
-<<<<<<< HEAD
-#ifdef CONFIG_EXT4_FS_ENCRYPTION
-=======
 #ifdef CONFIG_FS_ENCRYPTION
->>>>>>> 0d347d1faad20f477fd9dbb3f2c56d288cc43cf6
 static int uuid_is_zero(__u8 u[16])
 {
 	int	i;
@@ -785,21 +783,12 @@ resizefs_out:
 		return ext4_ext_precache(inode);
 
 	case EXT4_IOC_SET_ENCRYPTION_POLICY:
-<<<<<<< HEAD
 //		if (!ext4_has_feature_encrypt(sb))
 //			return -EOPNOTSUPP;
 		return fscrypt_ioctl_set_policy(filp, (const void __user *)arg);
 
 	case EXT4_IOC_GET_ENCRYPTION_PWSALT: {
-#ifdef CONFIG_EXT4_FS_ENCRYPTION
-=======
-		if (!ext4_has_feature_encrypt(sb))
-			return -EOPNOTSUPP;
-		return fscrypt_ioctl_set_policy(filp, (const void __user *)arg);
-
-	case EXT4_IOC_GET_ENCRYPTION_PWSALT: {
 #ifdef CONFIG_FS_ENCRYPTION
->>>>>>> 0d347d1faad20f477fd9dbb3f2c56d288cc43cf6
 		int err, err2;
 		struct ext4_sb_info *sbi = EXT4_SB(sb);
 		handle_t *handle;
