@@ -7079,13 +7079,8 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 out:
 	hba->req_abort_count = 0;
 	if (!err) {
-<<<<<<< HEAD
 		queue_delayed_work(system_power_efficient_wq, 
 			&hba->ufshpb_init_work,	msecs_to_jiffies(10));
-=======
-		queue_delayed_work(system_power_efficient_wq, &hba->ufshpb_init_work,
-					msecs_to_jiffies(10));
->>>>>>> fa52fc2f3600... Add PEWQ's to a few subsystems
 		err = SUCCESS;
 	} else {
 		dev_err(hba->dev, "%s: failed with err %d\n", __func__, err);
@@ -8166,13 +8161,8 @@ static int ufshcd_probe_hba(struct ufs_hba *hba)
 			hba->clk_scaling.is_allowed = true;
 		}
 
-<<<<<<< HEAD
 		queue_delayed_work(system_power_efficient_wq, 
 			&hba->ufshpb_init_work, msecs_to_jiffies(0));
-=======
-		queue_delayed_work(system_power_efficient_wq, &hba->ufshpb_init_work,
-						msecs_to_jiffies(0));
->>>>>>> fa52fc2f3600... Add PEWQ's to a few subsystems
 
 		scsi_scan_host(hba->host);
 		pm_runtime_put_sync(hba->dev);
