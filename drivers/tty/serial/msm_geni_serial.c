@@ -339,6 +339,11 @@ static int vote_clock_on(struct uart_port *uport)
 	port->ioctl_count++;
 	IPC_LOG_MSG(port->ipc_log_pwr, "%s%s ioctl %d usage_count %d\n",
 		__func__, current->comm, port->ioctl_count, usage_count);
+	dev_info(uport->dev,
+		"pid: %d, comm: %s voted clock to be on, "
+		"ioctl_count: %d\n",
+			current->pid, current->comm, port->ioctl_count);
+
 	return 0;
 }
 
@@ -361,6 +366,10 @@ static int vote_clock_off(struct uart_port *uport)
 	}
 	wait_for_transfers_inflight(uport);
 	port->ioctl_count--;
+	dev_info(uport->dev,
+		"pid: %d, comm: %s voted clock to be off, "
+		"ioctl_count: %d\n",
+			current->pid, current->comm, port->ioctl_count);
 	msm_geni_serial_power_off(uport);
 	IPC_LOG_MSG(port->ipc_log_pwr, "%s%s ioctl %d usage_count %d\n",
 		__func__, current->comm, port->ioctl_count, usage_count);
