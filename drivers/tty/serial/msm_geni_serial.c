@@ -301,6 +301,13 @@ static int vote_clock_on(struct uart_port *uport)
 	}
 	port->ioctl_count++;
 
+#ifdef DEBUG_PM
+	dev_info(uport->dev,
+		"pid: %d, comm: %s voted clock to be on, "
+		"ioctl_count: %d\n",
+			current->pid, current->comm, port->ioctl_count);
+#endif
+
 	return 0;
 }
 
