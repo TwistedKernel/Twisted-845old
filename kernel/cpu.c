@@ -8,7 +8,6 @@
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/sched.h>
-#include <linux/sched/smt.h>
 #include <linux/unistd.h>
 #include <linux/cpu.h>
 #include <linux/oom.h>
@@ -34,19 +33,6 @@
 
 #include "smpboot.h"
 
-/*
- * This assumes that half of the CPUs are little and that they have lower
- * CPU numbers than the big CPUs (e.g., on an 8-core system, CPUs 0-3 would be
- * little and CPUs 4-7 would be big).
- */
-#define LITTLE_CPU_MASK	((1UL << (NR_CPUS / 2)) - 1)
-#define BIG_CPU_MASK	(((1UL << NR_CPUS) - 1) & ~LITTLE_CPU_MASK)
-static const unsigned long little_cluster_cpus = LITTLE_CPU_MASK;
-const struct cpumask *const cpu_lp_mask = to_cpumask(&little_cluster_cpus);
-EXPORT_SYMBOL(cpu_lp_mask);
-static const unsigned long big_cluster_cpus = BIG_CPU_MASK;
-const struct cpumask *const cpu_perf_mask = to_cpumask(&big_cluster_cpus);
-EXPORT_SYMBOL(cpu_perf_mask);
 
 /**
  * cpuhp_cpu_state - Per cpu hotplug state storage
@@ -262,12 +248,6 @@ static struct {
 #define cpuhp_lock_acquire()      lock_map_acquire(&cpu_hotplug.dep_map)
 #define cpuhp_lock_release()      lock_map_release(&cpu_hotplug.dep_map)
 
-void cpu_hotplug_mutex_held(void)
-{
-	lockdep_assert_held(&cpu_hotplug.lock);
-}
-EXPORT_SYMBOL(cpu_hotplug_mutex_held);
-
 void get_online_cpus(void)
 {
 	might_sleep();
@@ -376,12 +356,6 @@ void cpu_hotplug_enable(void)
 }
 EXPORT_SYMBOL_GPL(cpu_hotplug_enable);
 #endif	/* CONFIG_HOTPLUG_CPU */
-
-/*
- * Architectures that need SMT-specific errata handling during SMT hotplug
- * should override this.
- */
-void __weak arch_smt_update(void) { }
 
 #ifdef CONFIG_HOTPLUG_SMT
 enum cpuhp_smt_control cpu_smt_control __read_mostly = CPU_SMT_ENABLED;
@@ -1094,7 +1068,6 @@ out:
 	/* This post dead nonsense must die */
 	if (!ret && hasdied)
 		cpu_notify_nofail(CPU_POST_DEAD, cpu);
-	arch_smt_update();
 	return ret;
 }
 
@@ -1107,7 +1080,14 @@ static int cpu_down_maps_locked(unsigned int cpu, enum cpuhp_state target)
 
 static int do_cpu_down(unsigned int cpu, enum cpuhp_state target)
 {
+	struct cpumask newmask;
 	int err;
+
+	cpumask_andnot(&newmask, cpu_online_mask, cpumask_of(cpu));
+	/* One big cluster CPU and one little cluster CPU must remain online */
+	if (!cpumask_intersects(&newmask, cpu_perf_mask) ||
+	    !cpumask_intersects(&newmask, cpu_lp_mask))
+		return -EINVAL;
 
 	cpu_maps_update_begin();
 	err = cpu_down_maps_locked(cpu, target);
@@ -1218,7 +1198,6 @@ static int _cpu_up(unsigned int cpu, int tasks_frozen, enum cpuhp_state target)
 out:
 	trace_cpuhp_latency(cpu, 1, start_time, ret);
 	cpu_hotplug_done();
-	arch_smt_update();
 	return ret;
 }
 
@@ -1309,6 +1288,7 @@ int freeze_secondary_cpus(int primary)
 {
 	int cpu, error = 0;
 
+	unaffine_perf_irqs();
 	cpu_maps_update_begin();
 	if (!cpu_online(primary))
 		primary = cpumask_first(cpu_online_mask);
@@ -1394,6 +1374,7 @@ void enable_nonboot_cpus(void)
 	cpumask_clear(frozen_cpus);
 out:
 	cpu_maps_update_done();
+	reaffine_perf_irqs();
 }
 
 static int __init alloc_frozen_cpus(void)
@@ -2104,10 +2085,8 @@ static int cpuhp_smt_disable(enum cpuhp_smt_control ctrlval)
 		 */
 		cpuhp_offline_cpu_device(cpu);
 	}
-	if (!ret) {
+	if (!ret)
 		cpu_smt_control = ctrlval;
-		arch_smt_update();
-	}
 	cpu_maps_update_done();
 	return ret;
 }
@@ -2118,7 +2097,6 @@ static int cpuhp_smt_enable(void)
 
 	cpu_maps_update_begin();
 	cpu_smt_control = CPU_SMT_ENABLED;
-	arch_smt_update();
 	for_each_present_cpu(cpu) {
 		/* Skip online CPUs and CPUs on offline nodes */
 		if (cpu_online(cpu) || !node_online(cpu_to_node(cpu)))
@@ -2281,6 +2259,22 @@ EXPORT_SYMBOL(__cpu_active_mask);
 struct cpumask __cpu_isolated_mask __read_mostly;
 EXPORT_SYMBOL(__cpu_isolated_mask);
 
+#if CONFIG_LITTLE_CPU_MASK
+static const unsigned long lp_cpu_bits = CONFIG_LITTLE_CPU_MASK;
+const struct cpumask *const cpu_lp_mask = to_cpumask(&lp_cpu_bits);
+#else
+const struct cpumask *const cpu_lp_mask = cpu_possible_mask;
+#endif
+EXPORT_SYMBOL(cpu_lp_mask);
+
+#if CONFIG_BIG_CPU_MASK
+static const unsigned long perf_cpu_bits = CONFIG_BIG_CPU_MASK;
+const struct cpumask *const cpu_perf_mask = to_cpumask(&perf_cpu_bits);
+#else
+const struct cpumask *const cpu_perf_mask = cpu_possible_mask;
+#endif
+EXPORT_SYMBOL(cpu_perf_mask);
+
 void init_cpu_present(const struct cpumask *src)
 {
 	cpumask_copy(&__cpu_present_mask, src);
@@ -2325,21 +2319,6 @@ void __init boot_cpu_hotplug_init(void)
 #endif
 	this_cpu_write(cpuhp_state.state, CPUHP_ONLINE);
 }
-
-enum cpu_mitigations cpu_mitigations __ro_after_init = CPU_MITIGATIONS_AUTO;
-
-static int __init mitigations_parse_cmdline(char *arg)
-{
-	if (!strcmp(arg, "off"))
-		cpu_mitigations = CPU_MITIGATIONS_OFF;
-	else if (!strcmp(arg, "auto"))
-		cpu_mitigations = CPU_MITIGATIONS_AUTO;
-	else if (!strcmp(arg, "auto,nosmt"))
-		cpu_mitigations = CPU_MITIGATIONS_AUTO_NOSMT;
-
-	return 0;
-}
-early_param("mitigations", mitigations_parse_cmdline);
 
 static ATOMIC_NOTIFIER_HEAD(idle_notifier);
 
