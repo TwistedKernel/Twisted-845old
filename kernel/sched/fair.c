@@ -8997,7 +8997,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
 	    (max_capacity < capacity)) {
 		mcc->val = capacity;
 		mcc->cpu = cpu;
-#ifdef CONFIG_SCHED_DEBUG
+#if 0
 		raw_spin_unlock_irqrestore(&mcc->lock, flags);
 		printk_deferred(KERN_INFO "CPU%d: update max cpu_capacity %lu\n",
 				cpu, capacity);
@@ -9995,9 +9995,9 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 		capacity = capacity_of(i);
 
 		/*
-		 * For ASYM_CPUCAPACITY domains, don't pick a CPU that could
+		 * For ASYM_CPUCAPACITY domains, don't pick a cpu that could
 		 * eventually lead to active_balancing high->low capacity.
-		 * Higher per-CPU capacity is considered better than balancing
+		 * Higher per-cpu capacity is considered better than balancing
 		 * average load.
 		 */
 		if (env->sd->flags & SD_ASYM_CPUCAPACITY &&
