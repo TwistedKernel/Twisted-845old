@@ -16,7 +16,6 @@
 #include <linux/delay.h>
 #include <crypto/engine.h>
 #include <crypto/internal/hash.h>
-#include <uapi/linux/sched/types.h>
 #include "internal.h"
 
 #define CRYPTO_ENGINE_MAX_QLEN 10

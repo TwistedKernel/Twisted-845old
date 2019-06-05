@@ -23,7 +23,6 @@
  */
 
 #include <linux/kthread.h>
-#include <uapi/linux/sched/types.h>
 
 #include "i915_drv.h"
 
