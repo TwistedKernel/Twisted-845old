@@ -16,6 +16,11 @@
 #include <linux/sched.h>
 #include <linux/jiffies.h>
 #include <linux/err.h>
+#include <linux/version.h>
+/* The sched_param struct is located elsewhere in newer kernels */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#include <uapi/linux/sched/types.h>
+#endif
 
 #include "kgsl.h"
 #include "kgsl_sharedmem.h"
@@ -985,13 +990,6 @@ static void _adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
 	spin_unlock(&dispatcher->plist_lock);
 }
 
-static inline void _decrement_submit_now(struct kgsl_device *device)
-{
-	spin_lock(&device->submit_lock);
-	device->submit_now--;
-	spin_unlock(&device->submit_lock);
-}
-
 /**
  * adreno_dispatcher_issuecmds() - Issue commmands from pending contexts
  * @adreno_dev: Pointer to the adreno device struct
@@ -1000,8 +998,6 @@ static inline void _decrement_submit_now(struct kgsl_device *device)
  */
 static void adreno_dispatcher_issuecmds(struct adreno_device *adreno_dev)
 {
-	struct adreno_dispatcher *dispatcher = &adreno_dev->dispatcher;
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	adreno_dispatcher_schedule(KGSL_DEVICE(adreno_dev));
 }
 
