@@ -189,7 +189,11 @@ journal_err_out:
 	return err;
 }
 
+<<<<<<< HEAD
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
+=======
+#ifdef CONFIG_FS_ENCRYPTION
+>>>>>>> 0d347d1faad20f477fd9dbb3f2c56d288cc43cf6
 static int uuid_is_zero(__u8 u[16])
 {
 	int	i;
@@ -781,12 +785,21 @@ resizefs_out:
 		return ext4_ext_precache(inode);
 
 	case EXT4_IOC_SET_ENCRYPTION_POLICY:
+<<<<<<< HEAD
 //		if (!ext4_has_feature_encrypt(sb))
 //			return -EOPNOTSUPP;
 		return fscrypt_ioctl_set_policy(filp, (const void __user *)arg);
 
 	case EXT4_IOC_GET_ENCRYPTION_PWSALT: {
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
+=======
+		if (!ext4_has_feature_encrypt(sb))
+			return -EOPNOTSUPP;
+		return fscrypt_ioctl_set_policy(filp, (const void __user *)arg);
+
+	case EXT4_IOC_GET_ENCRYPTION_PWSALT: {
+#ifdef CONFIG_FS_ENCRYPTION
+>>>>>>> 0d347d1faad20f477fd9dbb3f2c56d288cc43cf6
 		int err, err2;
 		struct ext4_sb_info *sbi = EXT4_SB(sb);
 		handle_t *handle;
